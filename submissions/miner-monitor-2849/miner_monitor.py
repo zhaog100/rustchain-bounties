@@ -12,6 +12,8 @@ import requests
 import time
 import json
 import smtplib
+import signal
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -45,9 +47,23 @@ class MinerMonitor:
     
     def __init__(self, config_path: str = "config.json"):
         self.config = self.load_config(config_path)
+        self.validate_config()
         self.miners: Dict[str, MinerStatus] = {}
         self.offline_miners: Set[str] = set()
         self.alert_cooldown: Dict[str, datetime] = {}
+        self.shutdown_event = threading.Event()
+        self.setup_signal_handlers()
+        
+    def setup_signal_handlers(self):
+        """Setup graceful shutdown signal handlers"""
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        logger.info("Signal handlers configured for graceful shutdown")
+    
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+        self.shutdown_event.set()
         
     def load_config(self, config_path: str) -> dict:
         """Load configuration from JSON file"""
@@ -61,6 +77,8 @@ class MinerMonitor:
                 "poll_interval": 600,  # 10 minutes
                 "offline_threshold": 2,  # 2 epochs (20 minutes)
                 "alert_cooldown": 3600,  # 1 hour
+                "retry_interval": 60,  # Retry interval on errors
+                "ssl_verify": True,  # Enable SSL verification by default
                 "discord_webhook": "",
                 "email_config": {
                     "smtp_server": "",
@@ -71,13 +89,42 @@ class MinerMonitor:
                 }
             }
     
+    def validate_config(self):
+        """Validate configuration values"""
+        # Validate poll_interval
+        if self.config.get('poll_interval', 600) <= 0:
+            logger.warning("Invalid poll_interval, using default 600s")
+            self.config['poll_interval'] = 600
+        
+        # Validate offline_threshold
+        if self.config.get('offline_threshold', 2) <= 0:
+            logger.warning("Invalid offline_threshold, using default 2")
+            self.config['offline_threshold'] = 2
+        
+        # Validate alert_cooldown
+        if self.config.get('alert_cooldown', 3600) <= 0:
+            logger.warning("Invalid alert_cooldown, using default 3600s")
+            self.config['alert_cooldown'] = 3600
+        
+        # Validate retry_interval
+        if self.config.get('retry_interval', 60) <= 0:
+            logger.warning("Invalid retry_interval, using default 60s")
+            self.config['retry_interval'] = 60
+        
+        logger.info("Configuration validated successfully")
+    
     def fetch_miners(self) -> List[dict]:
         """Fetch miner data from API"""
+        ssl_verify = self.config.get('ssl_verify', True)
+        
+        if not ssl_verify:
+            logger.warning("⚠️ SSL verification disabled - NOT RECOMMENDED for production!")
+        
         try:
             response = requests.get(
                 f"{self.config['api_url']}/miners",
                 timeout=30,
-                verify=False  # For testing, should use proper SSL in production
+                verify=ssl_verify
             )
             response.raise_for_status()
             return response.json()
@@ -87,11 +134,13 @@ class MinerMonitor:
     
     def fetch_streak(self, miner_id: str) -> dict:
         """Fetch streak data for a specific miner"""
+        ssl_verify = self.config.get('ssl_verify', True)
+        
         try:
             response = requests.get(
                 f"{self.config['api_url']}/miner/{miner_id}/streak",
                 timeout=30,
-                verify=False
+                verify=ssl_verify
             )
             response.raise_for_status()
             return response.json()
@@ -299,27 +348,34 @@ RustChain Mining Monitor
         
         if discord_sent or email_sent:
             self.alert_cooldown[miner_id] = datetime.now()
+        elif not discord_sent and not email_sent:
+            logger.error(f"All alert channels failed for miner {miner_id}")
     
     def monitor(self):
-        """Main monitoring loop"""
+        """Main monitoring loop with graceful shutdown support"""
         logger.info("Starting RustChain Miner Monitor...")
         
-        while True:
+        while not self.shutdown_event.is_set():
             try:
                 # Fetch all miners
                 miners_data = self.fetch_miners()
                 
                 if not miners_data:
                     logger.warning("No miners data received, retrying...")
-                    time.sleep(self.config['poll_interval'])
+                    # Use configurable retry interval
+                    self.shutdown_event.wait(self.config.get('retry_interval', 60))
                     continue
                 
                 # Update status for each miner
                 for miner_data in miners_data:
+                    if self.shutdown_event.is_set():
+                        break
                     self.update_miner_status(miner_data)
                 
                 # Send alerts for offline miners
                 for miner_id in list(self.offline_miners):
+                    if self.shutdown_event.is_set():
+                        break
                     self.send_offline_alert(miner_id)
                 
                 logger.info(
@@ -327,15 +383,15 @@ RustChain Mining Monitor
                     f"{len(self.offline_miners)} offline"
                 )
                 
-                # Wait for next poll
-                time.sleep(self.config['poll_interval'])
+                # Wait for next poll (interruptible by shutdown signal)
+                self.shutdown_event.wait(self.config['poll_interval'])
                 
-            except KeyboardInterrupt:
-                logger.info("Shutting down monitor...")
-                break
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
-                time.sleep(60)  # Wait before retrying
+                # Use configurable retry interval
+                self.shutdown_event.wait(self.config.get('retry_interval', 60))
+        
+        logger.info("Monitor shutdown complete")
 
 def main():
     """Main entry point"""
