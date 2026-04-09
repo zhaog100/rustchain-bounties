@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  rustchain-miner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: rustchain-miner
+    restart: unless-stopped
+    environment:
+      - RUSTCHAIN_WALLET=${RUSTCHAIN_WALLET:?Set your wallet address}
+      - RUSTCHAIN_NODE_URL=https://api.rustchain.io
+      - RUSTCHAIN_MINER_THREADS=1
+      - RUSTCHAIN_LOG_LEVEL=info
+    ports:
+      - "8080:8080"
+    volumes:
+      - miner-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  miner-data:
