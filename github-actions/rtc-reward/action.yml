@@ -1,0 +1,29 @@
+name: 'RTC Reward Action'
+description: 'Award RTC tokens to contributors for PRs and issues'
+author: 'RustChain Community'
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: true
+  rtc-amount:
+    description: 'Amount of RTC to award'
+    required: true
+  wallet-address:
+    description: 'Recipient wallet address (auto-detected from profile if not provided)'
+    required: false
+  rpc-url:
+    description: 'RustChain RPC endpoint'
+    required: false
+    default: 'https://api.rustchain.io/v1'
+  reason:
+    description: 'Reason for reward'
+    required: false
+    default: 'bounty-completion'
+outputs:
+  tx-hash:
+    description: 'Transaction hash of the reward'
+  amount-sent:
+    description: 'Amount of RTC sent'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
