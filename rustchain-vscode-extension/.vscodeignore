@@ -1,0 +1,12 @@
+.vscode
+node_modules/
+out/
+*.log
+.DS_Store
+*.vsix
+src/**/*.js
+src/**/*.js.map
+**/*.map
+test/
+.vscode-test/
+coverage/
