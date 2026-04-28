@@ -1,0 +1,116 @@
+{
+  "name": "rustchain-dashboard",
+  "displayName": "RustChain Dashboard",
+  "description": "RustChain wallet balance, miner status, and bounty board in your editor sidebar",
+  "version": "1.0.0",
+  "publisher": "rustchain",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rustchain-sidebar",
+          "title": "RustChain",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "rustchain-sidebar": [
+        {
+          "id": "rustchainWallet",
+          "name": "Wallet Balance"
+        },
+        {
+          "id": "rustchainMiner",
+          "name": "Miner Status"
+        },
+        {
+          "id": "rustchainBounties",
+          "name": "Open Bounties"
+        },
+        {
+          "id": "rustchainEpoch",
+          "name": "Epoch Timer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "rustchain.refresh",
+        "title": "RustChain: Refresh Data"
+      },
+      {
+        "command": "rustchain.setWallet",
+        "title": "RustChain: Set Wallet Name"
+      },
+      {
+        "command": "rustchain.claimBounty",
+        "title": "RustChain: Claim Bounty"
+      }
+    ],
+    "configuration": {
+      "title": "RustChain Dashboard",
+      "properties": {
+        "rustchain.nodeUrl": {
+          "type": "string",
+          "default": "https://50.28.86.131:8099",
+          "description": "RustChain node URL"
+        },
+        "rustchain.walletName": {
+          "type": "string",
+          "default": "",
+          "description": "Your RustChain wallet name"
+        },
+        "rustchain.refreshInterval": {
+          "type": "number",
+          "default": 60,
+          "description": "Auto-refresh interval in seconds"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Scottcjn/rustchain-bounties"
+  },
+  "keywords": [
+    "rustchain",
+    "cryptocurrency",
+    "blockchain",
+    "wallet",
+    "miner",
+    "bounty",
+    "dashboard"
+  ],
+  "author": "RustChain Team",
+  "license": "MIT"
+}
