@@ -1,0 +1,25 @@
+name: RTC Rewards
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  reward:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Award RTC on Merge
+        uses: ./  # For local testing; change to Scottcjn/rtc-reward-action@v1 in production
+        with:
+          node-url: 'https://50.28.86.131'
+          amount: '5'
+          wallet-from: 'project-fund'
+          admin-key: ${{ secrets.RTC_ADMIN_KEY }}
+          dry-run: 'true'  # Set to 'false' for production
