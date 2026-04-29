@@ -1,0 +1,156 @@
+name: 'RTC Reward on PR Merge'
+description: 'Automatically awards RTC tokens to contributors when their PR is merged'
+author: 'zhaog100 (小米辣) via RustChain'
+branding:
+  icon: 'award'
+  color: 'green'
+
+inputs:
+  node-url:
+    description: 'RustChain node URL'
+    required: true
+    default: 'https://50.28.86.131'
+  amount:
+    description: 'Amount of RTC to award per merged PR'
+    required: false
+    default: '5'
+  wallet-from:
+    description: 'Source wallet/project fund name'
+    required: false
+    default: 'project-fund'
+  admin-key:
+    description: 'RTC admin key for signing transfers'
+    required: true
+  dry-run:
+    description: 'Run in dry-run mode (no actual transfer)'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for posting comments'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check PR merged
+      shell: bash
+      run: |
+        MERGED="${{ github.event.pull_request.merged }}"
+        if [ "$MERGED" != "true" ]; then
+          echo "PR is not merged, skipping reward"
+          exit 0
+        fi
+        echo "✅ PR merged, proceeding with reward"
+
+    - name: Extract contributor wallet
+      id: wallet
+      shell: bash
+      run: |
+        # Try to extract wallet from PR body
+        PR_BODY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || echo "")
+        
+        # Look for wallet patterns in PR body
+        WALLET=""
+        
+        # Pattern 1: rtc-wallet: <name>
+        WALLET=$(echo "$PR_BODY" | grep -oiP '(?<=rtc-wallet:\s*)[a-zA-Z0-9_-]+' | head -1 || echo "")
+        
+        # Pattern 2: wallet: <name>
+        if [ -z "$WALLET" ]; then
+          WALLET=$(echo "$PR_BODY" | grep -oiP '(?<=wallet:\s*)[a-zA-Z0-9_-]+' | head -1 || echo "")
+        fi
+        
+        # Pattern 3: .rtc-wallet file in repo
+        if [ -z "$WALLET" ] && [ -f ".rtc-wallet" ]; then
+          WALLET=$(cat .rtc-wallet | tr -d '[:space:]')
+        fi
+        
+        # Fallback: use contributor username as wallet
+        if [ -z "$WALLET" ]; then
+          WALLET="${{ github.event.pull_request.user.login }}"
+          echo "⚠️ No wallet found in PR body or .rtc-wallet file"
+          echo "   Using GitHub username as wallet: $WALLET"
+        else
+          echo "✅ Found wallet in PR: $WALLET"
+        fi
+        
+        echo "wallet=$WALLET" >> $GITHUB_OUTPUT
+
+    - name: Dry run check
+      shell: bash
+      run: |
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "🔵 DRY RUN MODE — No actual transfer will occur"
+          echo "Would award ${{ inputs.amount }} RTC to ${{ steps.wallet.outputs.wallet }}"
+          echo "Source wallet: ${{ inputs.wallet-from }}"
+          exit 0
+        fi
+
+    - name: Award RTC
+      shell: bash
+      run: |
+        WALLET="${{ steps.wallet.outputs.wallet }}"
+        AMOUNT="${{ inputs.amount }}"
+        NODE_URL="${{ inputs.node-url }}"
+        ADMIN_KEY="${{ inputs.admin-key }}"
+        WALLET_FROM="${{ inputs.wallet-from }}"
+        
+        echo "🔄 Transferring $AMOUNT RTC to $WALLET..."
+        
+        # Call RustChain node transfer endpoint
+        RESPONSE=$(curl -s -X POST "$NODE_URL/wallet/transfer/signed" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"from_wallet\": \"$WALLET_FROM\",
+            \"to_wallet\": \"$WALLET\",
+            \"amount\": $AMOUNT,
+            \"admin_key\": \"$ADMIN_KEY\"
+          }" 2>/dev/null)
+        
+        echo "Response: $RESPONSE"
+        
+        # Check for success
+        if echo "$RESPONSE" | grep -q '"ok": true\|"success": true\|"status": "success"'; then
+          echo "✅ Transfer successful!"
+          echo "tx_hash=$(echo "$RESPONSE" | jq -r '.tx_hash // .transaction_id // "unknown"' 2>/dev/null)" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Transfer may have failed: $RESPONSE"
+          echo "tx_hash=failed" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Post PR comment
+      shell: bash
+      run: |
+        WALLET="${{ steps.wallet.outputs.wallet }}"
+        AMOUNT="${{ inputs.amount }}"
+        TX_HASH="${{ steps.award.outputs.tx_hash }}"
+        
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          COMMENT="## 🔵 RTC Reward (Dry Run)
+        
+          Would have awarded **${{ inputs.amount }} RTC** to \`$WALLET\`
+          
+          *Set \`dry-run: false\` to enable actual transfers*"
+        elif [ "$TX_HASH" = "failed" ] || [ -z "$TX_HASH" ]; then
+          COMMENT="## ⚠️ RTC Reward Attempted
+          
+          Attempted to award **${{ inputs.amount }} RTC** to \`$WALLET\`
+          
+          Transfer may not have completed. Please verify manually."
+        else
+          COMMENT="## 🎉 RTC Reward Awarded!
+          
+          **${{ inputs.amount }} RTC** has been sent to \`$WALLET\`
+          
+          Transaction: \`$TX_HASH\`
+          
+          Thank you for your contribution! 🚀"
+        fi
+        
+        # Post comment using GitHub API
+        curl -s -X POST \
+          "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+          -H "Authorization: Bearer ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -d "{\"body\": \"$COMMENT\"}" > /dev/null
