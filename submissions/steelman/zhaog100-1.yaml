@@ -1,0 +1,39 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: BFT consensus can be subverted by a Byzantine leader proposing fraudulent epoch settlements through the unauthenticated /bft/propose endpoint.
+  mechanism: The /bft/propose Flask route (rustchain_bft_consensus.py:1055) accepts arbitrary epoch/miners/distribution from any caller with zero authentication. A network attacker or compromised leader can submit a proposal that distributes all 1.5 RTC rewards to an attacker-controlled miner address. The proposal enters the 3-phase PBFT consensus pipeline (PRE-PREPARE → PREPARE → COMMIT), and if the leader controls f+1 nodes (1 of 4), the fraudulent settlement can achieve quorum. Additionally, view-change messages always carry prepared_cert=None, meaning a new leader after view change has no obligation to honor previously-prepared epochs, enabling rollback of committed state.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_bft_consensus.py#L1055
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_bft_consensus.py#L834
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7363
+steelman:
+  thesis: The BFT consensus is designed for a trusted network where all nodes are operated by known parties with shared HMAC keys, making external attacks impossible without key compromise.
+  mechanism: The system assumes a permissioned network: all nodes share a secret key from which per-node HMAC keys are derived (rustchain_bft_consensus.py:248). External attackers cannot forge consensus messages without the shared secret. The leader election is deterministic round-robin (sorted node IDs), and the 2f+1 quorum requirement means a single compromised node cannot unilaterally change consensus outcomes. The merkle root validation in _validate_proposal provides defense-in-depth against leader forging the miners list.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_bft_consensus.py#L248
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_bft_consensus.py#L335
+patch:
+  scope: node/rustchain_bft_consensus.py
+  diff_summary: Add HMAC-based authentication to /bft/propose endpoint; require view-change messages to carry prepared certificates with the highest-prepared epoch and matching PREPARE quorum; add committed_epochs check to _apply_settlement as a second idempotency guard.
+  link_or_diff: |
+    --- a/node/rustchain_bft_consensus.py
+    +++ b/node/rustchain_bft_consensus.py
+    @@ -1055,6 +1055,10 @@ def bft_propose():
+         data = request.get_json()
+    +    auth_header = request.headers.get('X-Node-Signature', '')
+    +    if not _verify_propose_auth(auth_header, data):
+    +        return jsonify({'error': 'Unauthorized'}), 401
+         epoch = data.get('epoch')
+    @@ -834,7 +838,7 @@ def _trigger_view_change(self):
+         vc_msg = ViewChangeMessage(
+             view=new_view,
+             epoch=self.current_epoch,
+    -        prepared_cert=None,
+    +        prepared_cert=self._build_prepared_cert(),
+             signature=signature,
+             timestamp=timestamp
+    @@ -763,6 +767,9 @@ def _apply_settlement(self, proposal):
+         epoch = proposal.get('epoch')
+    +    if epoch in self.committed_epochs:
+    +        return  # Already committed
+         distribution = proposal.get('distribution', {})
