@@ -1,0 +1,7 @@
+Open cores compute
+RISC-V pipelines flow clean
+No license needed
+
+archetype: riscv
+hardware: Sipeed MaixIII (RV64GC @ 1GHz)
+wallet: RTC019e78d600fb3131c29d7ba80aba8fe644be426e

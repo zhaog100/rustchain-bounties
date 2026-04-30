@@ -1,0 +1,7 @@
+Pools share one memory
+Neural engines humming
+Hardly draws power
+
+archetype: apple_silicon
+hardware: Apple M2 Pro (10-core CPU @ 3.5GHz)
+wallet: RTC019e78d600fb3131c29d7ba80aba8fe644be426e
