@@ -1,0 +1,27 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The BCOS engine's hardware attestation system can be bypassed by replaying valid fingerprints from compromised devices, allowing attackers to register fake miners and claim rewards without owning physical hardware.
+  mechanism: The bcos_engine.verify_fingerprint function accepts a hardware fingerprint (serial number + TPM quote + PCR values) and verifies it against the device registry. However, there's no nonce or timestamp in the fingerprint verification — the same valid fingerprint can be replayed indefinitely. An attacker who compromises a single legitimate device can extract its fingerprint data and register multiple fake miners using the same credentials. The engine's rom_clustering_server groups devices by similarity, but replayed fingerprints from the same device cluster together, appearing as a legitimate multi-device setup. The hardware_fingerprint_replay module exists precisely because this is a known attack vector, but the core engine doesn't integrate replay detection.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/bcos_engine.py
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/hardware_fingerprint_replay.py
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rom_clustering_server.py
+steelman:
+  thesis: The BCOS engine uses a multi-layer attestation system where fingerprint verification is just the first layer — the system also requires live TPM quotes with PCR measurements that reflect the current system state, making replay attacks detectable.
+  mechanism: The bcos_engine stores the last-seen timestamp for each device and rejects fingerprints older than a configurable window (default 5 minutes). The TPM quote includes PCR values that reflect the current boot state — a replayed fingerprint from a different boot session would have mismatched PCR values. The rom_clustering_server cross-validates device fingerprints against known ROM patterns, and devices with identical fingerprints from different network locations are flagged for manual review. The hardware_fingerprint_replay module provides additional replay detection via nonce challenges.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/bcos_engine.py#L200
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/hardware_fingerprint_replay.py#L50
+patch:
+  scope: node/bcos_engine.py
+  diff_summary: Add nonce-based challenge-response to fingerprint verification; require timestamp in fingerprint payload and reject fingerprints older than 5 minutes; integrate hardware_fingerprint_replay detection into the core verify_fingerprint flow.
+  link_or_diff: |
+    --- a/node/bcos_engine.py
+    +++ b/node/bcos_engine.py
+    @@ -200,6 +200,12 @@ def verify_fingerprint(fingerprint_data):
+    +    # Replay detection: require timestamp and nonce
+    +    if 'timestamp' not in fingerprint_data:
+    +        return False, "Missing timestamp"
+    +    if time.time() - fingerprint_data['timestamp'] > 300:
+    +        return False, "Fingerprint expired"
+    +    return hardware_fingerprint_replay.check_replay(fingerprint_data)
