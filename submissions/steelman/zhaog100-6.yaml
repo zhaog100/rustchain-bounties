@@ -1,0 +1,27 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The claims batch settlement module assumes sufficient funds when the database is unavailable, enabling unlimited payouts during partial system failures.
+  mechanism: In claims_settlement.py:127-139, the check_rewards_pool_balance function returns (True, required_urtc * 10) on any sqlite3.Error, including table-not-found and database-locked errors. An attacker who can trigger a database error — for example, by holding a long-running transaction that locks the rewards_pool table — causes the balance check to always pass. Subsequent settlement batches then proceed without verifying actual funds, draining the treasury. The sign_and_broadcast_transaction stub compounds this by using random.choices for transaction hashes and randomly failing 10% of the time.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_settlement.py#L127
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_settlement.py#L213
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7366
+steelman:
+  thesis: The settlement module is designed to be called by a trusted cron job that monitors the rewards_pool table separately, and the fallback is a safety valve for temporary database glitches, not a production code path.
+  mechanism: The process_claims_batch function has multiple safety checks: deduplication of claims via a seen set, dry_run support for testing, and explicit flagging of stale verifying claims for manual review. The sign_and_broadcast_transaction is explicitly marked as a STUB with a production integration note. In a proper deployment, the treasury balance would be monitored externally, and the settlement job would be paused if the database is unhealthy.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_settlement.py#L203
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_settlement.py#L377
+patch:
+  scope: node/claims_settlement.py
+  diff_summary: On database error, return (False, 0) instead of (True, ...) to halt settlements safely; replace the sign_and_broadcast stub with a proper integration point that requires explicit configuration before enabling.
+  link_or_diff: |
+    --- a/node/claims_settlement.py
+    +++ b/node/claims_settlement.py
+    @@ -136,8 +136,8 @@ def check_rewards_pool_balance(db_path, required_urtc):
+             except sqlite3.OperationalError:
+    -            balance = required_urtc * 10  # Assume 10x buffer
+    +            return False, 0  # Halt settlements on DB error
+    @@ -213,7 +213,7 @@ def sign_and_broadcast_transaction(tx_data, db_path):
+    -    if random.random() < 0.9:
+    +    raise NotImplementedError("Configure actual transaction integration before enabling settlement")
