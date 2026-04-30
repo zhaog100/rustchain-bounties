@@ -1,0 +1,25 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The claims eligibility system allows reward double-claiming because the epoch ownership check only verifies a single miner's claim history rather than checking all claims for that epoch globally.
+  mechanism: In claims_eligibility.py, the _check_double_claim function queries claims WHERE miner_id = ? AND epoch = ? — checking only whether this specific miner has already claimed this epoch. It does NOT check whether another miner has already claimed rewards for the same epoch. A malicious miner can submit claims for epochs worked by other miners, and the system will approve them because the double-claim check only looks at the submitting miner's own history. This is a classic TOCTOU vulnerability where the check (does this miner claim this epoch?) doesn't match the intended invariant (is this epoch already claimed by anyone?).
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_eligibility.py
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7359
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/claims_eligibility.py#L380
+steelman:
+  thesis: The claims system is designed for a PoA (Proof of Antiquity) model where each miner's work is independently verifiable through hardware attestation, making cross-miner epoch conflicts detectable by the attestation layer.
+  mechanism: Before a claim reaches the eligibility check, it must pass hardware attestation (bcos_engine.py) which binds the miner's work to specific physical hardware. The epoch_rewards table in the BFT consensus layer tracks which epochs have been settled, and the _apply_settlement function uses epoch-scoped ledger entries to ensure each epoch's rewards are credited exactly once. The claims_eligibility module is just one layer in a multi-layer verification pipeline.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_bft_consensus.py#L763
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/bcos_engine.py
+patch:
+  scope: node/claims_eligibility.py
+  diff_summary: Change _check_double_claim to query all claims for the epoch regardless of miner_id; add a UNIQUE constraint on (epoch) in the claims table to enforce at the database level.
+  link_or_diff: |
+    --- a/node/claims_eligibility.py
+    +++ b/node/claims_eligibility.py
+    @@ -380,7 +380,7 @@ def _check_double_claim(db_path, miner_id, epoch):
+    -    cursor.execute("SELECT COUNT(*) FROM claims WHERE miner_id = ? AND epoch = ?",
+    +    cursor.execute("SELECT COUNT(*) FROM claims WHERE epoch = ?",
+             (miner_id, epoch))
+    +        (epoch,))
