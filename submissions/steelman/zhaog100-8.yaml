@@ -1,0 +1,30 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The RIP-200 round-robin reward distribution can be manipulated by an attacker who controls multiple miner identities to receive disproportionate rewards through strategic epoch timing.
+  mechanism: In rewards_implementation_rip200.py, the _distribute_epoch_rewards function uses a round-robin algorithm that distributes rewards based on miner position in the sorted miners list. The sorting is deterministic (sorted by miner_id), so an attacker who registers miners with IDs that hash to favorable positions can consistently receive higher reward allocations. Additionally, the epoch settlement uses a per-miner upsert (INSERT OR REPLACE) which means if an attacker submits claims for the same epoch from different miner IDs, the last one wins — potentially overwriting legitimate claims from other miners. The epoch boundary check uses >= comparison which includes the boundary epoch, allowing double-counting at epoch transitions.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rewards_implementation_rip200.py
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7360
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rewards_implementation_rip200.py#L250
+steelman:
+  thesis: The RIP-200 distribution is designed for a permissioned network where miner identities are verified through hardware attestation (bcos_engine), making Sybil attacks prohibitively expensive.
+  mechanism: Each miner must provide a valid hardware fingerprint (bcos_engine.verify_fingerprint) before being included in the reward distribution. The round-robin sorting by miner_id is deterministic and transparent — all participants can verify the distribution is fair. The epoch_rewards table has a composite UNIQUE constraint on (miner_id, epoch) which prevents the same miner from claiming the same epoch twice. The settlement function uses INSERT OR REPLACE to handle legitimate re-settlement scenarios where the epoch needs to be recalculated.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/bcos_engine.py
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rewards_implementation_rip200.py#L180
+patch:
+  scope: node/rewards_implementation_rip200.py
+  diff_summary: Add per-epoch reward cap to prevent any single miner from receiving more than their fair share; change epoch boundary check from >= to > to prevent double-counting at transitions.
+  link_or_diff: |
+    --- a/node/rewards_implementation_rip200.py
+    +++ b/node/rewards_implementation_rip200.py
+    @@ -250,7 +250,7 @@ def _distribute_epoch_rewards(epoch, miners):
+    -    if miner_epoch >= epoch:
+    +    if miner_epoch > epoch:
+             continue
+    @@ -180,6 +180,10 @@ def settle_epoch(epoch, miners):
+         for miner in miners:
+    +        max_reward = total_reward / len(miners)
+    +        if miner_reward > max_reward:
+    +            minerReward = max_reward
+             db.execute("INSERT OR REPLACE INTO epoch_rewards ...", (...))
