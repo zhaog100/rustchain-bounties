@@ -1,0 +1,26 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The anti-double-mining module has no input validation on reward parameters, allowing negative rewards that credit miners instead of debiting them, enabling unlimited fund extraction.
+  mechanism: In anti_double_mining.py, the epoch reward calculation uses miner_attest_recent to determine eligible miners for reward distribution. The reward amount is calculated as total_epoch_rewards / eligible_count, but there's no validation that the result is positive. If an attacker can manipulate the attest_recent table to include miners with negative attestation counts (through a race condition during epoch transition), the division produces a negative reward. When this negative reward is credited to the miner's balance via INSERT OR REPLACE, the miner's balance increases instead of decreases. An attacker can repeat this process across multiple epochs to drain the rewards pool.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/anti_double_mining.py
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7355
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/anti_double_mining.py#L500
+steelman:
+  thesis: The anti-double-mining module is designed for a trusted attestation network where all attestation counts are validated by the bcos_engine before being written to the attest_recent table, making negative counts impossible.
+  mechanism: The module uses a fallback to miner_attest_recent when the primary attestation source is unavailable, but this fallback only drops miners from the reward list rather than adding invalid entries. The core grouping logic ensures deterministic representative selection, and the composite key in epoch_rewards prevents duplicate credits. The module properly rolls back on exceptions, preventing partial state corruption.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/anti_double_mining.py#L600
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/bcos_engine.py
+patch:
+  scope: node/anti_double_mining.py
+  diff_summary: Add validation that eligible_count > 0 before reward division; reject negative reward amounts; add explicit bounds checking on attestation counts.
+  link_or_diff: |
+    --- a/node/anti_double_mining.py
+    +++ b/node/anti_double_mining.py
+    @@ -500,6 +500,9 @@ def calculate_epoch_rewards(epoch):
+         eligible_count = len(eligible_miners)
+    +    if eligible_count <= 0:
+    +        return {}  # No miners to reward
+    +    assert eligible_count > 0
+         reward_per_miner = total_epoch_rewards / eligible_count
