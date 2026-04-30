@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BCOS Badge Generator — Beacon Certified Open Source</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --fg: #33ff33;
+      --fg-dim: #1a9a1a;
+      --border: #33ff3344;
+      --card-bg: #111;
+      --accent: #4c1;
+      --yellow: #dfb317;
+      --blue: #007ec6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--fg-dim); font-size: 0.85rem; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    label { display: block; color: var(--fg-dim); margin-bottom: 0.5rem; font-size: 0.9rem; }
+    input, select {
+      width: 100%;
+      background: #000;
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: var(--fg); }
+    .input-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .input-row > div { flex: 1; }
+    .btn {
+      display: inline-block;
+      background: var(--fg);
+      color: #000;
+      padding: 0.75rem 2rem;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      width: 100%;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { opacity: 0.7; }
+    .preview { text-align: center; padding: 2rem; background: #000; border-radius: 4px; margin-bottom: 1rem; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+    .preview img { max-height: 60px; }
+    .code-block {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 0.75rem;
+      position: relative;
+    }
+    .code-block pre {
+      color: var(--fg-dim);
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-right: 2.5rem;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: var(--border);
+      color: var(--fg);
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-family: inherit;
+    }
+    .copy-btn:hover { background: var(--fg); color: #000; }
+    .copy-btn.copied { background: var(--accent); }
+    .badge-styles { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .badge-style-btn {
+      padding: 0.4rem 0.8rem;
+      background: #000;
+      border: 1px solid var(--border);
+      color: var(--fg-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+    .badge-style-btn.active { border-color: var(--fg); color: var(--fg); background: #001a00; }
+    .badge-style-btn:hover { border-color: var(--fg); color: var(--fg); }
+    .score-display { font-size: 3rem; font-weight: bold; text-align: center; margin: 1rem 0; }
+    .score-display.pass { color: var(--accent); }
+    .score-display.fail { color: #f44; }
+    footer { text-align: center; color: var(--fg-dim); font-size: 0.75rem; margin-top: 3rem; }
+    footer a { color: var(--fg); }
+    .error { color: #f44; font-size: 0.85rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🛡️ BCOS Badge Generator</h1>
+    <p class="subtitle">Beacon Certified Open Source — Generate embeddable badges for your project</p>
+  </header>
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="input-row">
+      <div>
+        <label for="certId">Certificate ID</label>
+        <input type="text" id="certId" placeholder="BCOS-xxxxxxxx or auto-generate">
+      </div>
+      <div>
+        <label for="tier">Tier</label>
+        <select id="tier">
+          <option value="L0">L0 — Basic</option>
+          <option value="L1" selected>L1 — Verified</option>
+          <option value="L2">L2 — Certified</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-row">
+      <div>
+        <label for="score">Trust Score (0-100)</label>
+        <input type="number" id="score" min="0" max="100" value="72" placeholder="72">
+      </div>
+      <div>
+        <label for="repoUrl">Repository URL (optional)</label>
+        <input type="text" id="repoUrl" placeholder="https://github.com/user/repo">
+      </div>
+    </div>
+
+    <label>Badge Style</label>
+    <div class="badge-styles">
+      <button class="badge-style-btn active" data-style="flat">flat</button>
+      <button class="badge-style-btn" data-style="flat-square">flat-square</button>
+      <button class="badge-style-btn" data-style="for-the-badge">for-the-badge</button>
+      <button class="badge-style-btn" data-style="plastic">plastic</button>
+      <button class="badge-style-btn" data-style="social">social</button>
+    </div>
+
+    <button class="btn" id="generateBtn">⚡ Generate Badge</button>
+    <div id="error" class="error"></div>
+  </div>
+
+  <!-- Preview Card -->
+  <div class="card">
+    <label>Preview</label>
+    <div class="preview" id="preview">
+      <span style="color: var(--fg-dim)">Click "Generate Badge" to preview</span>
+    </div>
+
+    <label>Markdown</label>
+    <div class="code-block">
+      <button class="copy-btn" data-target="md-code">Copy</button>
+      <pre id="md-code">—</pre>
+    </div>
+
+    <label>HTML</label>
+    <div class="code-block">
+      <button class="copy-btn" data-target="html-code">Copy</button>
+      <pre id="html-code">—</pre>
+    </div>
+
+    <label>Raw SVG URL</label>
+    <div class="code-block">
+      <button class="copy-btn" data-target="svg-url">Copy</button>
+      <pre id="svg-url">—</pre>
+    </div>
+  </div>
+
+  <footer>
+    <p>Part of <a href="https://rustchain.org/bcos">BCOS v2</a> · <a href="https://github.com/Scottcjn/Rustchain">RustChain</a></p>
+    <p>Free & open source · MIT licensed</p>
+  </footer>
+</div>
+
+<script>
+const NODE_URL = 'https://50.28.86.131';
+let selectedStyle = 'flat';
+
+// Tier colors
+const TIER_COLORS = { L0: 'yellow', L1: 'brightgreen', L2: 'blue' };
+
+// Badge style buttons
+document.querySelectorAll('.badge-style-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.badge-style-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedStyle = btn.dataset.style;
+    generate();
+  });
+});
+
+// Generate button
+document.getElementById('generateBtn').addEventListener('click', generate);
+
+// Auto-generate on input change
+['certId', 'tier', 'score'].forEach(id => {
+  document.getElementById(id).addEventListener('input', debounce(generate, 500));
+});
+
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+function generate() {
+  const certId = document.getElementById('certId').value.trim() || generateCertId();
+  const tier = document.getElementById('tier').value;
+  const score = parseInt(document.getElementById('score').value) || 0;
+  const repoUrl = document.getElementById('repoUrl').value.trim();
+  const errorEl = document.getElementById('error');
+
+  // Validate
+  if (score < 0 || score > 100) {
+    errorEl.textContent = 'Score must be between 0 and 100';
+    return;
+  }
+  errorEl.textContent = '';
+
+  const color = TIER_COLORS[tier] || 'brightgreen';
+  const styleParam = selectedStyle !== 'flat' ? `&style=${selectedStyle}` : '';
+  
+  // Badge text
+  const badgeLabel = 'BCOS';
+  const badgeMsg = `v2 ${tier} (${score})`;
+  
+  // SVG badge URL (via shields.io-style endpoint)
+  const badgeUrl = `${NODE_URL}/bcos/badge/${certId}.svg?style=${selectedStyle}`;
+  
+  // Fallback: generate inline SVG
+  const inlineSvg = generateInlineBadge(badgeMsg, color, selectedStyle);
+  
+  // Verification URL
+  const verifyUrl = `${NODE_URL}/bcos/verify/${certId}`;
+  const targetUrl = repoUrl || verifyUrl;
+  
+  // Generate embed codes
+  const mdCode = `[![${badgeLabel}](${badgeUrl})](${targetUrl})`;
+  const htmlCode = `<a href="${targetUrl}"><img src="${badgeUrl}" alt="${badgeLabel}"></a>`;
+  const svgUrl = badgeUrl;
+  
+  // Update UI
+  document.getElementById('certId').value = certId;
+  document.getElementById('preview').innerHTML = `<a href="${targetUrl}" target="_blank">${inlineSvg}</a>`;
+  document.getElementById('md-code').textContent = mdCode;
+  document.getElementById('html-code').textContent = htmlCode;
+  document.getElementById('svg-url').textContent = svgUrl;
+}
+
+function generateCertId() {
+  const hex = Math.random().toString(16).substring(2, 10).toUpperCase();
+  return `BCOS-${hex}`;
+}
+
+function generateInlineBadge(msg, color, style) {
+  const isForTheBadge = style === 'for-the-badge';
+  const padding = isForTheBadge ? '5px 10px' : '4px 8px';
+  const fontSize = isForTheBadge ? '12px' : '11px';
+  const fontWeight = isForTheBadge ? 'bold' : 'normal';
+  const letterSpacing = isForTheBadge ? '1px' : '0';
+  
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${msg.length * 7 + 40}" height="20">
+    <linearGradient id="bg" x2="0" y2="100%">
+      <stop offset="0" stop-color="#555" stop-opacity=".1"/>
+      <stop offset="1" stop-color="#444" stop-opacity=".1"/>
+    </linearGradient>
+    <rect rx="3" width="100%" height="20" fill="#444" stroke="#ddd" stroke-width="0.5"/>
+    <rect x="40" rx="3" width="100%" height="20" fill="#${colorToHex(color)}"/>
+    <text x="22" y="14" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="${fontSize}" fill="#fff" font-weight="${fontWeight}" letter-spacing="${letterSpacing}">BCOS</text>
+    <text x="${msg.length * 3.5 + 44}" y="14" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="${fontSize}" fill="#fff" font-weight="${fontWeight}" letter-spacing="${letterSpacing}">${msg}</text>
+  </svg>`;
+}
+
+function colorToHex(color) {
+  const map = {
+    'yellow': 'dfb317',
+    'brightgreen': '4c1',
+    'blue': '007ec6',
+    'green': '4c1',
+    'red': 'e05d44',
+    'lightgrey': '9f9f9f'
+  };
+  return map[color] || '4c1';
+}
+
+// Copy buttons
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.target);
+    const text = target.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  });
+});
+
+// Initial generate
+generate();
+</script>
+</body>
+</html>
