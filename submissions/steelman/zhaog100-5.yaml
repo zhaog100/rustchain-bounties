@@ -1,0 +1,26 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The UTXO database layer has an undefined variable in mempool_add() that causes a NameError, creating a database lock leak that can permanently lock the UTXO table and halt all transaction processing.
+  mechanism: In utxo_db.py:563, the mempool_add function references 'manage_tx' in the except clause, but this variable was never defined in the function scope (the code uses 'tx' as the transaction variable name). When mempool_add catches any exception (duplicate tx, validation error, etc.), Python raises NameError: name 'manage_tx' is not defined. Since the outer try/except doesn't catch this NameError, it propagates up and the database connection remains locked with an uncommitted transaction. After one error, all subsequent UTXO operations fail with "database is locked", effectively bricking the node.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/utxo_db.py#L563
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7362
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/utxo_db.py#L540
+steelman:
+  thesis: The UTXO database is designed with proper connection pooling and transaction management in the integrated node module, where the manage_tx variable would be defined by the calling context or imported from the main node module.
+  mechanism: The utxo_db module imports from rustchain_v2_integrated_v2_2_1_rip200 (utxo_db.py:23), which may define manage_tx as a global or provide it through the import chain. The module also has a get_db() function that manages connections, and the main node integration handles connection lifecycle through the Flask request context. The unit test module (test_utxo_db.py) provides mocked versions that define manage_tx, suggesting the production code expects it to be available.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/utxo_db.py#L23
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/rustchain_v2_integrated_v2.2.1_rip200.py
+patch:
+  scope: node/utxo_db.py
+  diff_summary: Replace undefined manage_tx reference with the correct variable name; add explicit connection cleanup in the except clause; add a test that triggers mempool_add failure and verifies the connection is not locked.
+  link_or_diff: |
+    --- a/node/utxo_db.py
+    +++ b/node/utxo_db.py
+    @@ -560,7 +560,7 @@ def mempool_add(db_conn, tx):
+             db_conn.execute("INSERT INTO mempool ...", (...))
+         except Exception as e:
+    -        manage_tx.rollback()
+    +        db_conn.rollback()
+             raise
