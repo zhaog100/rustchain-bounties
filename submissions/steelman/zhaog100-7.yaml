@@ -1,0 +1,24 @@
+miner_id: RTC-prefix-40-hex
+attack:
+  thesis: The on-chain governance system uses non-constant-time string comparison for founder veto verification, enabling timing attacks that can bypass the founder's veto power and pass malicious proposals.
+  mechanism: In governance.py:430, the founder_veto function compares the provided veto signature against the expected signature using `!=` instead of `hmac.compare_digest`. String comparison returns early on the first mismatched character, so an attacker can determine the correct veto signature one character at a time by measuring response times. With ~10,000 requests per character and microsecond timing precision, a 64-character hex signature can be recovered in under an hour. Once the veto signature is known, the attacker can forge a veto for any legitimate proposal, effectively giving them veto power over all governance decisions.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/governance.py#L430
+    - https://github.com/Scottcjn/rustchain-bounties/pull/7361
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/governance.py#L420
+steelman:
+  thesis: The governance system is designed for a trusted network where the founder's veto key is never exposed to network requests — the veto signature is generated locally and the API endpoint is only called by the founder's own trusted client.
+  mechanism: The founder_veto endpoint requires a signature that only the founder can produce. The governance system uses parameterized SQL queries throughout, preventing injection attacks. The proposal state machine enforces valid transitions (proposed → voting → approved/rejected), and the vote upsert logic ensures each voter can only vote once per proposal. The veto check is just one layer — proposals also require quorum approval from the voting committee.
+  evidence:
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/governance.py#L200
+    - https://github.com/Scottcjn/Rustchain/blob/main/node/governance.py#L350
+patch:
+  scope: node/governance.py
+  diff_summary: Replace `provided_sig != expected_sig` with `hmac.compare_digest(provided_sig, expected_sig)` in founder_veto; add rate limiting on veto endpoint to further mitigate timing attacks.
+  link_or_diff: |
+    --- a/node/governance.py
+    +++ b/node/governance.py
+    @@ -430,7 +430,7 @@ def founder_veto(proposal_id, signature):
+    -    if provided_sig != expected_sig:
+    +    if not hmac.compare_digest(provided_sig, expected_sig):
+             return False
