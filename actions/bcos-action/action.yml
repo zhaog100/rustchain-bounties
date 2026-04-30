@@ -1,0 +1,88 @@
+name: 'BCOS v2 — Beacon Certified Open Source'
+description: 'Scan repos with BCOS v2, post trust-score badges, anchor attestations on merge'
+author: 'zhaog100'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  tier:
+    description: 'BCOS tier: L0, L1, or L2'
+    required: false
+    default: 'L1'
+  reviewer:
+    description: 'Reviewer name for attestation'
+    required: false
+    default: 'bcos-ci'
+  node-url:
+    description: 'RustChain node URL for attestation anchoring'
+    required: false
+    default: 'https://50.28.86.131'
+  repo-path:
+    description: 'Path to repository root (default: github workspace)'
+    required: false
+    default: ''
+  engine-url:
+    description: 'URL to download bcos_engine.py (default: from RustChain repo)'
+    required: false
+    default: ''
+  github-token:
+    description: 'GitHub token for PR comments'
+    required: false
+    default: ${{ github.token }}
+  anchor-on-merge:
+    description: 'Anchor attestation to RustChain on PR merge (true/false)'
+    required: false
+    default: 'true'
+  admin-key:
+    description: 'Admin key for anchoring attestations (required if anchor-on-merge=true)'
+    required: false
+    default: ''
+  fail-on-tier-miss:
+    description: 'Fail the action if the repo does not meet the required tier'
+    required: false
+    default: 'true'
+
+outputs:
+  trust_score:
+    description: 'Overall trust score (0-100)'
+    value: ${{ steps.bcos.outputs.trust_score }}
+  cert_id:
+    description: 'BCOS certificate ID'
+    value: ${{ steps.bcos.outputs.cert_id }}
+  tier_met:
+    description: 'Whether the required tier was met (true/false)'
+    value: ${{ steps.bcos.outputs.tier_met }}
+  tier_achieved:
+    description: 'Highest tier achieved (L0/L1/L2)'
+    value: ${{ steps.bcos.outputs.tier_achieved }}
+  report:
+    description: 'JSON report summary'
+    value: ${{ steps.bcos.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: bcos
+      shell: bash
+      env:
+        BCOS_TIER: ${{ inputs.tier }}
+        BCOS_REVIEWER: ${{ inputs.reviewer }}
+        BCOS_NODE_URL: ${{ inputs.node-url }}
+        BCOS_REPO_PATH: ${{ inputs.repo-path }}
+        BCOS_ENGINE_URL: ${{ inputs.engine-url }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        BCOS_ANCHOR_ON_MERGE: ${{ inputs.anchor-on-merge }}
+        BCOS_ADMIN_KEY: ${{ inputs.admin-key }}
+        BCOS_FAIL_ON_TIER_MISS: ${{ inputs.fail-on-tier-miss }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        EVENT_ACTION: ${{ github.event.action }}
+        PR_MERGED: ${{ github.event.pull_request.merged }}
+        REPO_OWNER: ${{ github.repository_owner }}
+        REPO_NAME: ${{ github.event.repository.name }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        # Run BCOS scan
+        echo "🔍 Running BCOS v2 scan (tier=$BCOS_TIER, reviewer=$BCOS_REVIEWER)"
+        python3 "${{ github.action_path }}/src/bcos_scan.py"
