@@ -1,0 +1,46 @@
+{
+  "judge_wallet": "RTC019e78d600fb3131c29d7ba80aba8fe644be426e",
+  "submitted_at": "2026-04-30T01:40:00Z",
+  "rankings": [
+    {
+      "claim_url": "https://github.com/Scottcjn/rustchain-bounties/issues/7340",
+      "rank": 1,
+      "score": 0.88,
+      "fraud_risk": "low",
+      "payout_recommendation": {"amount_rtc": 175, "rationale": "Security audit with 3 OTC Bridge vulnerabilities at CRITICAL/HIGH severity — specific, detailed findings with PoC code"},
+      "justification": "Claims 3 specific OTC Bridge vulnerabilities with severity ratings; cross-referenced against PR #7339 which contains matching technical findings"
+    },
+    {
+      "claim_url": "https://github.com/Scottcjn/rustchain-bounties/issues/7342",
+      "rank": 2,
+      "score": 0.75,
+      "fraud_risk": "low",
+      "payout_recommendation": {"amount_rtc": 20, "rationale": "GitHub Action auto-award RTC — functional implementation with workflow YAML and action.yml"},
+      "justification": "Implements bounty #2864 with composite action; competing submission exists (PR #7351 by zhaog100 with improved v2)"
+    },
+    {
+      "claim_url": "https://github.com/Scottcjn/rustchain-bounties/issues/7348",
+      "rank": 3,
+      "score": 0.62,
+      "fraud_risk": "low",
+      "payout_recommendation": {"amount_rtc": 2, "rationale": "PR Review of #7344 SECURITY.md fix — small but substantive review of escape handling in markdown tables"},
+      "justification": "Reviews PR #7344 which fixes < character escaping in SECURITY.md markdown table; meets 2-observation minimum for PR Review bounty #2782"
+    },
+    {
+      "claim_url": "https://github.com/Scottcjn/rustchain-bounties/issues/7347",
+      "rank": 4,
+      "score": 0.45,
+      "fraud_risk": "medium",
+      "payout_recommendation": {"amount_rtc": 5, "rationale": "3 Hardware Haikus submitted — need to verify 5-7-5 syllable count and archetype enum compliance"},
+      "justification": "Claims bounty #2844 with 3 haikus; must verify each follows 5-7-5 format and has valid archetype from enum (vintage_powerpc/riscv/apple_silicon etc.)"
+    },
+    {
+      "claim_url": "https://github.com/Scottcjn/rustchain-bounties/issues/7346",
+      "rank": 5,
+      "score": 0.25,
+      "fraud_risk": "high",
+      "payout_recommendation": {"amount_rtc": 0, "rationale": "Follow bounty #2269 for @jaxint — unclear deliverable, appears to be social engagement rather than substantive contribution"},
+      "justification": "Follow bounty #2269 claim by @jaxint lacks specific technical deliverable; social engagement bounties have high fraud risk and unclear acceptance criteria"
+    }
+  ]
+}
