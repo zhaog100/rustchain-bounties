@@ -1,0 +1,51 @@
+name: 'RTC Reward Action'
+description: 'Automatically award RTC tokens to contributors when their PR is merged'
+author: 'zhaog100'
+
+branding:
+  icon: 'award'
+  color: 'green'
+
+inputs:
+  node-url:
+    description: 'RustChain node URL for RPC calls'
+    required: false
+    default: 'https://50.28.86.131'
+  amount:
+    description: 'Amount of RTC to award per merged PR'
+    required: false
+    default: '5'
+  wallet-from:
+    description: 'Project treasury wallet address'
+    required: true
+  admin-key:
+    description: 'Admin private key for signing transactions'
+    required: true
+  dry-run:
+    description: 'Simulate payment without sending (true/false)'
+    required: false
+    default: 'false'
+  pr-body-pattern:
+    description: 'Regex pattern to extract wallet from PR body'
+    required: false
+    default: 'wallet[:\s]+(RTC[0-9a-fA-F]{40,})'
+  comment-on-success:
+    description: 'Template for success comment. Use {amount}, {wallet}, {tx}, {pr}'
+    required: false
+    default: '💰 **RTC Reward** — {amount} RTC sent to `{wallet}`\nTransaction: `{tx}`'
+  comment-on-dryrun:
+    description: 'Template for dry-run comment'
+    required: false
+    default: '🧪 **DRY RUN** — Would award {amount} RTC to `{wallet}` for PR #{pr}'
+  comment-on-skip:
+    description: 'Template for skip comment (no wallet found)'
+    required: false
+    default: '⚠️ No contributor wallet found. Add `wallet: RTC...` to PR body or create `.rtc-wallet` in repo root.'
+  github-token:
+    description: 'GitHub token for PR comments'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

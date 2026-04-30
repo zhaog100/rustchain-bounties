@@ -1,0 +1,38 @@
+{
+  "name": "rtc-reward-action",
+  "version": "1.0.0",
+  "description": "Automatically award RTC tokens when a PR is merged. Any open source project can reward contributors with crypto.",
+  "main": "src/main.js",
+  "scripts": {
+    "build": "ncc build src/main.js -o dist --minify --license licenses.txt",
+    "test": "node src/main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhaog100/rtc-reward-action.git"
+  },
+  "keywords": [
+    "github",
+    "action",
+    "rtc",
+    "reward",
+    "rustchain",
+    "bounty",
+    "crypto",
+    "pull-request",
+    "contributor-incentive"
+  ],
+  "author": "zhaog100",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Scottcjn/rustchain-bounties/issues/2864"
+  },
+  "homepage": "https://github.com/Scottcjn/rustchain-bounties#readme",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
+  }
+}
